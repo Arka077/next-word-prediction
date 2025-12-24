@@ -1,7 +1,6 @@
 import streamlit as st
 import tensorflow as tf
 import numpy as np
-import time
 from datetime import datetime
 import os
 import urllib.request
@@ -9,7 +8,7 @@ import urllib.request
 # ============================================
 # PAGE CONFIG
 # ============================================
-st.set_page_config(
+st. set_page_config(
     page_title="AI Notepad - Sherlock Holmes",
     page_icon="📝",
     layout="wide"
@@ -21,21 +20,23 @@ st.set_page_config(
 @st.cache_resource
 def load_model_and_vocab():
     """
-    Load Keras model and vocabulary, downloading if not present (for Streamlit Cloud).
+    Load Keras model and vocabulary from GitHub repository. 
     """
     import pickle
 
-    # URLs for model and vocab files (replace with your own if needed)
-    MODEL_URL = "https://huggingface.co/datasets/Arka077/next-word-prediction/resolve/main/next_word_model.keras"
-    WORD_TO_IDX_URL = "https://huggingface.co/datasets/Arka077/next-word-prediction/resolve/main/word_to_idx.pkl"
-    IDX_TO_WORD_URL = "https://huggingface.co/datasets/Arka077/next-word-prediction/resolve/main/idx_to_word.pkl"
+    # GitHub raw content URLs for model and vocab files
+    REPO_BASE_URL = "https://github.com/Arka077/next-word-prediction/raw/main/"
+    MODEL_URL = REPO_BASE_URL + "next_word_model.keras"
+    WORD_TO_IDX_URL = REPO_BASE_URL + "word_to_idx.pkl"
+    IDX_TO_WORD_URL = REPO_BASE_URL + "idx_to_word.pkl"
 
     def download_if_missing(filename, url):
         if not os.path.exists(filename):
             try:
-                st.info(f"Downloading {filename}...")
+                st.info(f"Downloading {filename} from GitHub repository...")
                 urllib.request.urlretrieve(url, filename)
-            except Exception as e:
+                st.success(f"✅ {filename} downloaded successfully!")
+            except Exception as e: 
                 st.error(f"Failed to download {filename}: {e}")
                 raise
 
@@ -58,12 +59,12 @@ def load_model_and_vocab():
         with open('idx_to_word.pkl', 'rb') as f:
             idx_to_word = pickle.load(f)
     except Exception as e:
-        st.warning(f"⚠️  Vocabulary files not found or failed to load: {e}")
+        st. warning(f"⚠️  Vocabulary files not found or failed to load: {e}")
         word_to_idx = {"PAD": 0, "UNK": 1}
         idx_to_word = {0: "PAD", 1: "UNK"}
 
     seq_length = 30
-    unk_id = word_to_idx.get("UNK", 1)
+    unk_id = word_to_idx. get("UNK", 1)
     return model, word_to_idx, idx_to_word, seq_length, unk_id
 
 # Load model and vocab (only logs once due to cache)
@@ -85,7 +86,7 @@ except Exception as e:
 def suggest_next_words(model, current_text, word_to_idx, idx_to_word, 
                        seq_length, unk_id, top_k=5, temperature=0.7):
     """Get word suggestions"""
-    if not current_text.strip():
+    if not current_text. strip():
         return []
     
     tokens = current_text.lower().split()
@@ -100,7 +101,7 @@ def suggest_next_words(model, current_text, word_to_idx, idx_to_word,
     preds = np.exp(preds)
     preds = preds / np.sum(preds)
     top_indices = np.argsort(preds)[-top_k:][::-1]
-    suggestions = [(idx_to_word.get(idx, "UNK"), preds[idx]) for idx in top_indices]
+    suggestions = [(idx_to_word. get(idx, "UNK"), preds[idx]) for idx in top_indices]
     return suggestions
 
 def generate_continuation(model, start_text, word_to_idx, idx_to_word,
@@ -135,30 +136,19 @@ def generate_continuation(model, start_text, word_to_idx, idx_to_word,
 if 'text_content' not in st.session_state:
     st.session_state.text_content = ""
 
-if 'last_update_time' not in st.session_state:
-    st.session_state.last_update_time = time.time()
-
-if 'show_suggestions' not in st.session_state:
-    st.session_state.show_suggestions = False
-
 if 'suggestions' not in st.session_state:
     st.session_state.suggestions = []
 
 if 'preview_text' not in st.session_state:
     st.session_state.preview_text = ""
 
-if 'typing_active' not in st.session_state:
-    st.session_state.typing_active = False
-
-# Callback for text updates
-def update_text_callback():
-    st.session_state.last_update_time = time.time()
-    st.session_state.typing_active = True
+if 'show_suggestions' not in st.session_state:
+    st.session_state.show_suggestions = False
 
 # ============================================
-# CUSTOM CSS & JAVASCRIPT FOR AUTO-DETECTION
+# CUSTOM CSS
 # ============================================
-st.markdown("""
+st. markdown("""
 <style>
     .stTextArea textarea {
         font-family: 'Georgia', serif;
@@ -167,7 +157,7 @@ st.markdown("""
     }
     
     .suggestion-box {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background:  linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         border-radius: 10px;
         padding: 20px;
         margin: 10px 0;
@@ -176,7 +166,7 @@ st.markdown("""
     }
     
     .suggestion-item {
-        background: rgba(255,255,255,0.2);
+        background:  rgba(255,255,255,0.2);
         border-radius: 5px;
         padding: 10px 15px;
         margin: 5px 0;
@@ -184,7 +174,7 @@ st.markdown("""
         transition: all 0.3s;
     }
     
-    .suggestion-item:hover {
+    . suggestion-item:hover {
         background: rgba(255,255,255,0.3);
         transform: translateX(5px);
     }
@@ -205,48 +195,34 @@ st.markdown("""
         padding: 15px;
         margin: 10px 0;
     }
-</style>
-
-<script>
-// Monitor textarea for typing activity
-let typingTimer;
-const typingDelay = 2000; // 2 seconds
-
-function setupTypingDetector() {
-    const textarea = document.querySelector('.stTextArea textarea');
-    if (textarea) {
-        textarea.addEventListener('input', function() {
-            clearTimeout(typingTimer);
-            typingTimer = setTimeout(function() {
-                // Force Streamlit to detect the change
-                const event = new Event('change', { bubbles: true });
-                textarea.dispatchEvent(event);
-            }, typingDelay);
-        });
+    
+    .info-banner {
+        background: #fff3cd;
+        border-left: 4px solid #ffc107;
+        padding: 12px;
+        border-radius:  5px;
+        margin:  10px 0;
+        color: #856404;
     }
-}
-
-// Run setup when page loads
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', setupTypingDetector);
-} else {
-    setupTypingDetector();
-}
-
-// Also run on Streamlit reruns
-setTimeout(setupTypingDetector, 100);
-</script>
+</style>
 """, unsafe_allow_html=True)
 
 # ============================================
 # MAIN UI
 # ============================================
 st.title("📝 AI-Powered Notepad")
-st.markdown("*Sherlock Holmes Edition - Start typing and pause for suggestions*")
+st.markdown("*Sherlock Holmes Edition - Type your text and press **Ctrl+Enter** to predict*")
+
+# Info banner
+st.markdown("""
+<div class="info-banner">
+    <strong>💡 How to use:</strong> Type your text in the left panel, then press <strong>Ctrl+Enter</strong> (or Cmd+Enter on Mac) to generate next word predictions! 
+</div>
+""", unsafe_allow_html=True)
 
 # Sidebar settings
 with st.sidebar:
-    st.header("⚙️ Settings")
+    st. header("⚙️ Settings")
     
     temperature = st.slider(
         "Creativity Level",
@@ -271,20 +247,13 @@ with st.sidebar:
         value=20
     )
     
-    auto_suggest_delay = st.slider(
-        "Auto-suggest Delay (seconds)",
-        min_value=1.0,
-        max_value=5.0,
-        value=2.0,
-        step=0.5
-    )
-    
     st.markdown("---")
     
     if st.button("🗑️ Clear All"):
         st.session_state.text_content = ""
         st.session_state.suggestions = []
         st.session_state.preview_text = ""
+        st.session_state.show_suggestions = False
         st.rerun()
     
     if st.button("💾 Export Text"):
@@ -295,6 +264,14 @@ with st.sidebar:
             file_name=f"notepad_{timestamp}.txt",
             mime="text/plain"
         )
+    
+    st.markdown("---")
+    
+    if not model_loaded:
+        st. warning("⚠️ Model not loaded")
+        st.info("Suggestions will be placeholder text.")
+    else:
+        st. success("✅ Model loaded successfully")
 
 # Main content area
 col1, col2 = st.columns([2, 1])
@@ -302,27 +279,28 @@ col1, col2 = st.columns([2, 1])
 with col1:
     st.subheader("✍️ Your Text")
     
-    # Text area with on_change callback
-    text_input = st.text_area(
-        label="Write here...",
-        value=st.session_state.text_content,
-        height=400,
-        key="text_area",
-        label_visibility="collapsed",
-        placeholder="Start typing your Sherlock Holmes story...",
-        on_change=lambda: update_text_callback()
-    )
+    # Use a form to capture Ctrl+Enter
+    with st. form(key='text_form', clear_on_submit=False):
+        text_input = st.text_area(
+            label="Write here...",
+            value=st.session_state.text_content,
+            height=400,
+            key="text_area",
+            label_visibility="collapsed",
+            placeholder="Start typing your Sherlock Holmes story...  (Press Ctrl+Enter to predict next words)",
+        )
+        
+        # This button is triggered by Ctrl+Enter
+        predict_button = st.form_submit_button("🔮 Predict Next Words (Ctrl+Enter)", use_container_width=True)
     
-    # Update session state
-    if text_input != st.session_state.text_content:
+    # Handle form submission
+    if predict_button: 
         st.session_state.text_content = text_input
-        st.session_state.last_update_time = time.time()
-        # Force a rerun after delay to show suggestions
-        time.sleep(0.1)
+        st. session_state.show_suggestions = True
     
     # Word count
-    word_count = len(text_input.split()) if text_input else 0
-    char_count = len(text_input)
+    word_count = len(st.session_state.text_content.split()) if st.session_state.text_content else 0
+    char_count = len(st.session_state.text_content)
     
     st.markdown(f"""
     <div class="stats-box">
@@ -333,26 +311,23 @@ with col1:
 with col2:
     st.subheader("💡 AI Suggestions")
     
-    if not model_loaded:
-        st.warning("⚠️ Model not loaded. Please ensure 'next_word_model.keras' and vocab files are in the same directory.")
-        st.info("The app will still work but suggestions will be placeholder text.")
-    
-    # Check if we should show suggestions (after delay of no typing)
-    time_since_update = time.time() - st.session_state.last_update_time
-    
-    if text_input.strip() and time_since_update >= auto_suggest_delay:
+    # Check if we should show suggestions
+    if st.session_state.show_suggestions and st.session_state.text_content. strip():
         if model_loaded:
             # Generate real suggestions
             try:
                 print("\n" + "="*60)
-                print(f"⏰ User stopped typing ({auto_suggest_delay}s pause detected)")
+                print(f"🔮 User pressed Ctrl+Enter - Generating predictions")
                 print("="*60)
                 
                 suggestions = suggest_next_words(
                     model,
-                    text_input, word_to_idx, idx_to_word, 
-                    seq_length, unk_id, 
-                    top_k=suggestion_count, 
+                    st.session_state.text_content,
+                    word_to_idx,
+                    idx_to_word,
+                    seq_length,
+                    unk_id,
+                    top_k=suggestion_count,
                     temperature=temperature
                 )
                 
@@ -363,8 +338,9 @@ with col2:
                 
                 for i, (word, prob) in enumerate(suggestions, 1):
                     if st.button(f"{i}. {word} ({prob*100:.0f}%)", key=f"sugg_{i}"):
-                        print(f"\n👆 User selected suggestion: '{word}'")
+                        print(f"\n👆 User selected suggestion:  '{word}'")
                         st.session_state.text_content += f" {word}"
+                        st. session_state.show_suggestions = False
                         st.rerun()
                 
                 st.markdown("</div>", unsafe_allow_html=True)
@@ -372,8 +348,11 @@ with col2:
                 # Preview continuation
                 preview = generate_continuation(
                     model,
-                    text_input, word_to_idx, idx_to_word,
-                    seq_length, unk_id,
+                    st.session_state.text_content,
+                    word_to_idx,
+                    idx_to_word,
+                    seq_length,
+                    unk_id,
                     num_words=preview_length,
                     temperature=temperature
                 )
@@ -386,20 +365,24 @@ with col2:
                 """, unsafe_allow_html=True)
                 
                 # Full continuation button
-                if st.button("🚀 Generate Full Continuation"):
+                if st.button("🚀 Generate Full Continuation (50 words)"):
                     print("\n🚀 User requested full continuation (50 words)")
                     continuation = generate_continuation(
                         model,
-                        text_input, word_to_idx, idx_to_word,
-                        seq_length, unk_id,
+                        st.session_state.text_content,
+                        word_to_idx,
+                        idx_to_word,
+                        seq_length,
+                        unk_id,
                         num_words=50,
                         temperature=temperature
                     )
                     print(f"✅ Full continuation inserted into text\n")
                     st.session_state.text_content += " " + continuation
+                    st. session_state.show_suggestions = False
                     st.rerun()
                     
-            except Exception as e:
+            except Exception as e: 
                 print(f"\n❌ ERROR: {e}\n")
                 st.error(f"Error generating suggestions: {e}")
                 
@@ -418,36 +401,29 @@ with col2:
                 ("evidence", 0.12)
             ]
             
-            for i, (word, prob) in enumerate(placeholder_suggestions[:suggestion_count], 1):
+            for i, (word, prob) in enumerate(placeholder_suggestions[: suggestion_count], 1):
                 if st.button(f"{i}. {word} ({prob*100:.0f}%)", key=f"sugg_{i}"):
                     st.session_state.text_content += f" {word}"
+                    st.session_state.show_suggestions = False
                     st.rerun()
             
             st.markdown("</div>", unsafe_allow_html=True)
             
             st.markdown("""
             <div class="preview-box">
-                <strong>✨ Preview:</strong><br>
-                (Placeholder) the detective carefully examined the evidence...
+                <strong>✨ Preview: </strong><br>
+                (Placeholder) the detective carefully examined the evidence... 
             </div>
             """, unsafe_allow_html=True)
     
     else:
-        st.info(f"⏳ Keep typing or pause for {auto_suggest_delay:.1f}s for suggestions...")
+        st.info("⏳ Type your text in the left panel and press **Ctrl+Enter** to get predictions!")
 
 # Footer
 st.markdown("---")
 st.markdown("""
-<div style='text-align: center; color: #666;'>
-    <small>💡 Tip: Stop typing for suggestions to appear automatically | Click suggestions to insert | 
-    Adjust creativity in sidebar</small>
+<div style='text-align: center; color:  #666;'>
+    <small>💡 Tip: Press <strong>Ctrl+Enter</strong> (Cmd+Enter on Mac) in the text area to generate predictions | 
+    Click suggestions to insert | Adjust creativity in sidebar</small>
 </div>
 """, unsafe_allow_html=True)
-
-# Auto-refresh mechanism - check every 0.5 seconds
-if text_input.strip():
-    time_since_update = time.time() - st.session_state.last_update_time
-    if time_since_update < auto_suggest_delay:
-        # Still typing or just stopped, wait a bit and check again
-        time.sleep(0.5)
-        st.rerun()
