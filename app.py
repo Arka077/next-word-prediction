@@ -3,6 +3,8 @@ import tensorflow as tf
 import numpy as np
 import time
 from datetime import datetime
+import os
+import urllib.request
 
 # ============================================
 # PAGE CONFIG
@@ -19,53 +21,49 @@ st.set_page_config(
 @st.cache_resource
 def load_model_and_vocab():
     """
-    Load Keras model and vocabulary
+    Load Keras model and vocabulary, downloading if not present (for Streamlit Cloud).
     """
     import pickle
-    
-    print("\n" + "=" * 60)
-    print("🚀 STARTING MODEL LOADING...")
-    print("=" * 60)
-    
+
+    # URLs for model and vocab files (replace with your own if needed)
+    MODEL_URL = "https://huggingface.co/datasets/Arka077/next-word-prediction/resolve/main/next_word_model.keras"
+    WORD_TO_IDX_URL = "https://huggingface.co/datasets/Arka077/next-word-prediction/resolve/main/word_to_idx.pkl"
+    IDX_TO_WORD_URL = "https://huggingface.co/datasets/Arka077/next-word-prediction/resolve/main/idx_to_word.pkl"
+
+    def download_if_missing(filename, url):
+        if not os.path.exists(filename):
+            try:
+                st.info(f"Downloading {filename}...")
+                urllib.request.urlretrieve(url, filename)
+            except Exception as e:
+                st.error(f"Failed to download {filename}: {e}")
+                raise
+
+    # Download model and vocab if not present
+    download_if_missing('next_word_model.keras', MODEL_URL)
+    download_if_missing('word_to_idx.pkl', WORD_TO_IDX_URL)
+    download_if_missing('idx_to_word.pkl', IDX_TO_WORD_URL)
+
     # Load Keras model
-    print("\n📦 Loading Keras model from 'next_word_model.keras'...")
     try:
         model = tf.keras.models.load_model('next_word_model.keras')
-        print("✅ Model loaded successfully!")
-        print(f"   Model input shape: {model.input_shape}")
-        print(f"   Model output shape: {model.output_shape}")
     except Exception as e:
-        print(f"❌ Failed to load model: {e}")
+        st.error(f"❌ Failed to load model: {e}")
         raise
-    
+
     # Load vocab dicts
-    print("\n📚 Loading vocabulary dictionaries...")
     try:
         with open('word_to_idx.pkl', 'rb') as f:
             word_to_idx = pickle.load(f)
-        print(f"✅ word_to_idx.pkl loaded ({len(word_to_idx)} words)")
-        
         with open('idx_to_word.pkl', 'rb') as f:
             idx_to_word = pickle.load(f)
-        print(f"✅ idx_to_word.pkl loaded ({len(idx_to_word)} words)")
-    except FileNotFoundError as e:
-        print(f"⚠️  Vocabulary files not found: {e}")
-        print("   Using fallback vocabulary...")
+    except Exception as e:
+        st.warning(f"⚠️  Vocabulary files not found or failed to load: {e}")
         word_to_idx = {"PAD": 0, "UNK": 1}
         idx_to_word = {0: "PAD", 1: "UNK"}
-    
+
     seq_length = 30
     unk_id = word_to_idx.get("UNK", 1)
-    
-    print("\n📊 Configuration:")
-    print(f"   Sequence length: {seq_length}")
-    print(f"   Vocabulary size: {len(word_to_idx)}")
-    print(f"   UNK token ID: {unk_id}")
-    
-    print("\n" + "=" * 60)
-    print("✨ MODEL READY FOR INFERENCE!")
-    print("=" * 60 + "\n")
-    
     return model, word_to_idx, idx_to_word, seq_length, unk_id
 
 # Load model and vocab (only logs once due to cache)
@@ -73,7 +71,6 @@ try:
     model, word_to_idx, idx_to_word, seq_length, unk_id = load_model_and_vocab()
     model_loaded = True
 except Exception as e:
-    print(f"❌ Model loading failed: {e}\n")
     st.sidebar.error(f"⚠️ Model not loaded: {e}")
     model_loaded = False
     model = None
@@ -91,37 +88,19 @@ def suggest_next_words(model, current_text, word_to_idx, idx_to_word,
     if not current_text.strip():
         return []
     
-    print(f"\n🔮 Generating suggestions for: '{current_text[-50:]}...'")
-    
     tokens = current_text.lower().split()
     seed = [word_to_idx.get(w, unk_id) for w in tokens]
-    
     if len(seed) < seq_length:
         seed = [word_to_idx.get("PAD", 0)] * (seq_length - len(seed)) + seed
     else:
         seed = seed[-seq_length:]
-    
-    print(f"   Input tokens: {len(tokens)}, Using last {len(seed)} tokens")
-    
     seed_array = np.array(seed, dtype=np.int32).reshape(1, -1)
-    
-    # Get predictions
-    print("   Running model inference...")
     preds = model.predict(seed_array, verbose=0)[0]
-    
-    # Apply temperature
     preds = np.log(preds + 1e-9) / temperature
     preds = np.exp(preds)
     preds = preds / np.sum(preds)
-    
-    # Get top K
     top_indices = np.argsort(preds)[-top_k:][::-1]
     suggestions = [(idx_to_word.get(idx, "UNK"), preds[idx]) for idx in top_indices]
-    
-    print(f"   ✅ Generated {len(suggestions)} suggestions:")
-    for word, prob in suggestions:
-        print(f"      - {word}: {prob*100:.1f}%")
-    
     return suggestions
 
 def generate_continuation(model, start_text, word_to_idx, idx_to_word,
@@ -130,41 +109,24 @@ def generate_continuation(model, start_text, word_to_idx, idx_to_word,
     if not start_text.strip():
         return ""
     
-    print(f"\n✍️  Generating {num_words}-word continuation...")
-    print(f"   Starting text: '{start_text[-50:]}...'")
-    
     tokens = start_text.lower().split()
     seed = [word_to_idx.get(w, unk_id) for w in tokens]
-    
     if len(seed) < seq_length:
         seed = [word_to_idx.get("PAD", 0)] * (seq_length - len(seed)) + seed
     else:
         seed = seed[-seq_length:]
-    
     generated = []
-    
     for i in range(num_words):
         seed_array = np.array(seed, dtype=np.int32).reshape(1, -1)
-        
-        # Get predictions
         preds = model.predict(seed_array, verbose=0)[0]
-        
-        # Apply temperature
         preds = np.log(preds + 1e-9) / temperature
         preds = np.exp(preds)
         preds = preds / np.sum(preds)
-        
         next_id = np.random.choice(len(preds), p=preds)
         next_word = idx_to_word.get(next_id, "UNK")
         generated.append(next_word)
         seed = seed[1:] + [next_id]
-        
-        if (i + 1) % 10 == 0:
-            print(f"   Progress: {i + 1}/{num_words} words generated")
-    
     result = " ".join(generated)
-    print(f"   ✅ Continuation complete: '{result[:50]}...'")
-    
     return result
 
 # ============================================
